@@ -5,8 +5,14 @@ export default defineManifest({
   manifest_version: 3,
   name: pkg.name,
   version: pkg.version,
+  description: pkg.description,
   icons: {
-    48: 'public/logo.png',
+    16: 'public/icon-16.png',
+    32: 'public/icon-32.png',
+    // 48: 'public/icon-48.png',
+    128: 'public/icon-128.png',
+    256: 'public/icon-256.png',
+    512: 'public/icon-512.png',
   },
   action: {
     default_icon: {
@@ -16,13 +22,16 @@ export default defineManifest({
   },
   content_scripts: [{
     js: ['src/content/main.ts'],
-    matches: ['https://*/*'],
+    "matches": [
+        "*://music.youtube.com/*"
+    ],
   }],
   permissions: [
-    'sidePanel',
-    'contentSettings',
+    'storage',
   ],
-  side_panel: {
-    default_path: 'src/sidepanel/index.html',
+  background: {
+    service_worker: 'src/background/main.ts',
+    type: 'module',
   },
+
 })

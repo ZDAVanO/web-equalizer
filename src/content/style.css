@@ -1,0 +1,29 @@
+.eq-toggle-btn {
+    margin-right: 8px;
+    /* padding: 8px; */
+    border-radius: 20px;
+    border: none;
+    /* background: #222; */
+    background: transparent;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+    height: 32px;
+    width: 40px;
+    box-sizing: border-box;
+}
+.eq-toggle-btn.on {
+    background: #1db954;
+    color: #fff;
+}
+
+
+
+.eq-toggle-btn img {
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
+  /* Make icon white */
+  filter: brightness(0) invert(1);
+}
