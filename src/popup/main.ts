@@ -1,36 +1,37 @@
-import { setupCounter } from './counter.ts'
+
 import './style.css'
 
+// Set up the main HTML structure for the popup
 document.querySelector('#app')!.innerHTML = `
   <div>
     <h1>YTM Equalizer</h1>
     <div class="card">
       <button id="eq-toggle-btn" type="button">Equalizer</button>
     </div>
-    <p class="read-the-docs">
-      Click on the CRXJS logo to learn more
-    </p>
   </div>
 `
 
-const eqBtn = document.querySelector<HTMLButtonElement>('#eq-toggle-btn')!;
-let eqOn = false;
+// Get reference to the Equalizer toggle button
+const eqToggle = document.querySelector<HTMLButtonElement>('#eq-toggle-btn')!;
 
-function updateBtn() {
-  eqBtn.classList.toggle('on', eqOn);
-  eqBtn.textContent = eqOn ? 'Equalizer ON' : 'Equalizer OFF';
+// Update the button appearance and text based on enabled state
+function updateEqToggle(enabled: boolean) {
+  eqToggle.classList.toggle('on', enabled);
+  eqToggle.textContent = enabled ? "Equalizer ON" : "Equalizer OFF";
 }
 
-chrome.storage.local.get(['eqOn'], (result) => {
-  eqOn = !!result.eqOn;
-  updateBtn();
+// Initialize button state from chrome.storage
+chrome.storage.local.get("eqEnabled", data => {
+  const enabled = Boolean(data.eqEnabled);
+  updateEqToggle(enabled);
 });
 
-eqBtn.onclick = () => {
-  eqOn = !eqOn;
-  chrome.storage.local.set({ eqOn }, () => {
-    updateBtn();
+// Handle button click: toggle state and update storage
+eqToggle.addEventListener("click", () => {
+  chrome.storage.local.get("eqEnabled", data => {
+    const newState = !data.eqEnabled;
+    chrome.storage.local.set({ eqEnabled: newState });
+    updateEqToggle(newState);
   });
-};
+});
 
-setupCounter(document.querySelector('#counter')!)
