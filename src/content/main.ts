@@ -158,7 +158,9 @@ chrome.storage.local.get("eqEnabled", data => {
 });
 
 // React to storage changes (all tabs update EQ automatically)
-chrome.storage.onChanged.addListener(changes => {
+chrome.storage.onChanged.addListener((changes, area) => {
+    console.log('[EQ] storage.onChanged detected:', changes, area);
+
     if (changes.eqEnabled) {
         eqEnabled = !!changes.eqEnabled.newValue;
         // const newVal = changes.eqEnabled.newValue;
@@ -174,8 +176,11 @@ chrome.storage.onChanged.addListener(changes => {
                 clearEqualizer(lastPlayedElement);
             }
         }
-        
     }
+
+
+
+    
 });
 
 
