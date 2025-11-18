@@ -89,7 +89,7 @@ document.querySelector('#app')!.innerHTML = `
     <div class="card">
       <button id="eq-toggle-btn" type="button">Equalizer</button>
       <select id="presets-select"></select>
-      <button id="save-preset-btn" type="button">Save</button>
+      <button id="save-preset-btn" type="button">New</button>
       <button id="delete-preset-btn" type="button">Delete</button>
     </div>
 
@@ -128,17 +128,11 @@ const modalSaveBtn = document.getElementById('modal-save-btn') as HTMLButtonElem
 
 const presetNameInput = document.getElementById('preset-name-input') as HTMLInputElement
 
+const customPresetName = "[Custom]"
 
 
 
 
-function loadUserPresets(cb?: () => void) {
-  chrome.storage.local.get("userPresets", data => {
-    userPresets = Array.isArray(data.userPresets) ? data.userPresets : []
-    updatePresetsSelector()
-    if (cb) cb()
-  })
-}
 
 
 
@@ -166,7 +160,7 @@ function updatePresetsSelector() {
 
 function updateDeleteButtonState() {
   const selectedName = presetsSelect.value
-  deletePresetBtn.disabled = !isUserPreset(selectedName)
+  deletePresetBtn.disabled = !isUserPreset(selectedName) // || selectedName === customPresetName;
 }
 
 
@@ -270,16 +264,28 @@ deletePresetBtn.addEventListener("click", () => {
 })
 
 
+
+
 // --- Load presets on startup ---
-loadUserPresets(() => {
-  chrome.storage.local.get("selectedPreset", data => {
-    const name = typeof data.selectedPreset === "string" ? data.selectedPreset : defaultPresets[0].name
-    presetsSelect.value = name
-    setSlidersFromPreset(name)
-    // Update delete button state on load
-    updateDeleteButtonState()
-  })
+chrome.storage.local.get("userPresets", data => {
+  console.log('Loaded userPresets from storage:', data.userPresets);
+  userPresets = Array.isArray(data.userPresets) ? data.userPresets : []
+  updatePresetsSelector()
+
 })
+
+chrome.storage.local.get("selectedPreset", data => {
+  const name = typeof data.selectedPreset === "string" ? data.selectedPreset : defaultPresets[0].name
+  console.log('Loaded selectedPreset from storage:', name);
+  presetsSelect.value = name
+  setSlidersFromPreset(name)
+  // Update delete button state on load
+  updateDeleteButtonState()
+})
+
+
+
+
 
 
 // --- Update sliders and storage on preset change ---
@@ -292,7 +298,6 @@ presetsSelect.addEventListener("change", () => {
 
   // updateCurrentFilters();
 });
-
 
 
 
@@ -362,6 +367,33 @@ function autosaveUserPreset() {
   chrome.storage.local.set({ userPresets });
 }
 
+function autosaveCustomPreset() {
+  console.log('[autosaveCustomPreset]');
+
+  const name = presetsSelect.value;
+  if (!isDefaultPreset(name)) return;
+
+  const filters = getCurrentFiltersFromUI();
+  const customPreset: Preset = { name: customPresetName, filters };
+
+  // chrome.storage.local.set({ customPreset });
+  // Додаємо або оновлюємо "Custom" у userPresets
+  const idx = userPresets.findIndex(p => p.name === customPresetName);
+  if (idx === -1) {
+    userPresets.push(customPreset);
+  } else {
+    userPresets[idx] = customPreset;
+  }
+  chrome.storage.local.set({ userPresets });
+
+  updatePresetsSelector();
+  presetsSelect.value = customPresetName;
+
+  chrome.storage.local.set({ selectedPreset: customPresetName })
+
+}
+
+
 
 function updateCurrentFilters() {
   currentFilters = getCurrentFiltersFromUI();
@@ -370,6 +402,14 @@ function updateCurrentFilters() {
 
   chrome.storage.local.set({ currentFilters });
 }
+
+
+function handleEqChanges() {
+  autosaveCustomPreset();
+  autosaveUserPreset();
+  updateCurrentFilters();
+}
+
 
 
 slidersConfig.forEach(({ initial }, i) => {
@@ -390,8 +430,7 @@ slidersConfig.forEach(({ initial }, i) => {
     inputElem.value = (this as HTMLInputElement).value;
 
 
-    autosaveUserPreset();
-    updateCurrentFilters();
+    handleEqChanges();
   };
 
   // Manual input changes update slider
@@ -403,16 +442,14 @@ slidersConfig.forEach(({ initial }, i) => {
     inputElem.value = sliderElem.value;
 
 
-    autosaveUserPreset();
-    updateCurrentFilters();
+    handleEqChanges();
   });
 
   // Filter type change
   if (filterTypeElem) {
     filterTypeElem.addEventListener("change", () => {
 
-      autosaveUserPreset();
-      updateCurrentFilters();
+      handleEqChanges();
     });
   }
 
@@ -420,8 +457,7 @@ slidersConfig.forEach(({ initial }, i) => {
   if (qInputElem) {
     qInputElem.addEventListener("input", () => {
 
-      autosaveUserPreset();
-      updateCurrentFilters();
+    handleEqChanges();
     });
   }
 });

@@ -75,7 +75,7 @@ function updateFiltersFromPreset(cf_preset: FilterPreset) {
 
 // MARK: applyEqualizer
 function applyEqualizer(ae_audioElement: HTMLMediaElement) {
-    console.log('applyEqualizer');
+    console.log('[applyEqualizer]');
 
     let audioSource: MediaElementAudioSourceNode;
 
