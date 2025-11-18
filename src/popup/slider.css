@@ -61,15 +61,15 @@
   justify-content: center;
   align-items: center;
   flex-direction: column;
-  width: 10%; /* was 20% */
-  height: 340px; /* було 240px, стало довше */
+  width: 10%;
+  height: 340px;
 }
 .range-slider__range {
   z-index: 10;
   -webkit-appearance: none;
-  border-radius: 6px; /* was 12px */
-  width: 210px; /* було 110px, стало довше */
-  height: 6px; /* was 12px */
+  border-radius: 6px;
+  width: 210px;
+  height: 6px;
   background: #111312;
   box-shadow: -2px 1.5px 1px 0px rgba(0, 0, 0, 0.55) inset;
   outline: none;
@@ -80,11 +80,11 @@
 
 .range-slider__range::-webkit-slider-thumb {
   appearance: none;
-  width: 32px; /* was 64px */
-  height: 28px; /* was 56px */
-  border-radius: 8px; /* was 16px */
+  width: 32px;
+  height: 28px;
+  border-radius: 8px;
   position: relative;
-  border: 2px solid #222222; /* was 4px */
+  border: 2px solid #81786a;
   z-index: 10;
   background: linear-gradient(90deg, #272727 0%, #212121 100%);
 
@@ -100,11 +100,11 @@
 
 .range-slider__range::-moz-range-thumb {
   appearance: none;
-  width: 32px; /* was 64px */
-  height: 28px; /* was 56px */
-  border-radius: 8px; /* was 16px */
+  width: 32px;
+  height: 28px;
+  border-radius: 8px;
   position: relative;
-  border: 2px solid #222222; /* was 4px */
+  border: 2px solid #81786a;
   z-index: 10;
   background: linear-gradient(90deg, #272727 0%, #212121 100%);
 

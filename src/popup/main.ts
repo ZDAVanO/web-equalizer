@@ -1,7 +1,7 @@
 import './style.css'
 import defaultPresets from '../content/defaultPresets'
 
-console.log('[EQ] Popup script loaded');
+console.log('Popup script loaded');
 
 const filterTypeShort: Record<BiquadFilterType, string> = {
   lowpass: 'LP',
@@ -18,8 +18,41 @@ const filterTypes: BiquadFilterType[] = [
   "lowpass", "highpass", "bandpass", "lowshelf", "highshelf", "peaking", "notch", "allpass"
 ];
 
+
+// Unified sliders configuration
+const slidersConfig = [
+  { idx: 1, initial: 0, freq: 32 },
+  { idx: 2, initial: 0, freq: 64 },
+  { idx: 3, initial: 0, freq: 125 },
+  { idx: 4, initial: 0, freq: 250 },
+  { idx: 5, initial: 0, freq: 500 },
+  { idx: 6, initial: 0, freq: 1000 },
+  { idx: 7, initial: 0, freq: 2000 },
+  { idx: 8, initial: 0, freq: 4000 },
+  { idx: 9, initial: 0, freq: 8000 },
+  { idx: 10, initial: 0, freq: 16000 }
+];
+
+const freqLabels: Record<number, string> = {
+  32: "32Hz",
+  64: "64Hz",
+  125: "125Hz",
+  250: "250Hz",
+  500: "500Hz",
+  1000: "1KHz",
+  2000: "2KHz",
+  4000: "4KHz",
+  8000: "8KHz",
+  16000: "16KHz"
+};
+
+
+
+
+
+
 // Helper to render a slider's HTML
-function renderSlider(idx: number, initial: number, freq: string) {
+function renderSlider(idx: number, initial: number, freq: number) {
   return `
     <div id="range-slider-${idx}" class="range-slider">
       <div class="slider-bg-1">
@@ -30,7 +63,7 @@ function renderSlider(idx: number, initial: number, freq: string) {
         <input type="number" id="input${idx}" class="number-fx" min="-12" max="12" step=".1" value="${initial}">
       </div>
       <div class="freq-value">
-        <p id="output" class="number-fx">${freq}</p>
+        <p id="output" class="number-fx">${freqLabels[freq]}</p>
       </div>
       <div class="filter-type">
         <select id="filter-type-${idx}">
@@ -44,19 +77,8 @@ function renderSlider(idx: number, initial: number, freq: string) {
   `;
 }
 
-// Unified sliders configuration
-const slidersConfig = [
-  { idx: 1, initial: 0, freq: "32Hz", slider: "slider1", input: "input1" },
-  { idx: 2, initial: 0, freq: "64Hz", slider: "slider2", input: "input2" },
-  { idx: 3, initial: 0, freq: "125Hz", slider: "slider3", input: "input3" },
-  { idx: 4, initial: 0, freq: "250Hz", slider: "slider4", input: "input4" },
-  { idx: 5, initial: 0, freq: "500Hz", slider: "slider5", input: "input5" },
-  { idx: 6, initial: 0, freq: "1KHz", slider: "slider6", input: "input6" },
-  { idx: 7, initial: 0, freq: "2KHz", slider: "slider7", input: "input7" },
-  { idx: 8, initial: 0, freq: "4KHz", slider: "slider8", input: "input8" },
-  { idx: 9, initial: 0, freq: "8KHz", slider: "slider9", input: "input9" },
-  { idx: 10, initial: 0, freq: "16KHz", slider: "slider10", input: "input10" }
-];
+
+
 
 // Set up the main HTML structure for the popup
 document.querySelector('#app')!.innerHTML = `
@@ -86,11 +108,14 @@ document.querySelector('#app')!.innerHTML = `
     </div>
   </div>
 `
-// --- End UI ---
 
-// --- Preset management ---
+
+
+
 type Preset = { name: string, filters: any[] }
 let userPresets: Preset[] = []
+
+let currentFilters: any[] = [];
 
 const presetsSelect = document.querySelector<HTMLSelectElement>('#presets-select')!
 
@@ -103,31 +128,58 @@ const modalSaveBtn = document.getElementById('modal-save-btn') as HTMLButtonElem
 
 const presetNameInput = document.getElementById('preset-name-input') as HTMLInputElement
 
+
+
+
+
 function loadUserPresets(cb?: () => void) {
   chrome.storage.local.get("userPresets", data => {
     userPresets = Array.isArray(data.userPresets) ? data.userPresets : []
-    renderPresetsSelector()
+    updatePresetsSelector()
     if (cb) cb()
   })
 }
 
-function renderPresetsSelector() {
-  const allPresets = [...userPresets, ...defaultPresets]
-  presetsSelect.innerHTML = allPresets.map((preset) =>
-    `<option value="${preset.name}">${preset.name}${isUserPreset(preset.name) ? ' (custom)' : ''}</option>`
-  ).join('')
+
+
+function updatePresetsSelector() {
+  // Group user presets and default presets using <optgroup>
+  let html = '';
+  if (userPresets.length > 0) {
+    html += `<optgroup label="My presets">`;
+    html += userPresets.map((preset) =>
+      `<option value="${preset.name}">${preset.name}</option>`
+    ).join('');
+    html += `</optgroup>`;
+  }
+  html += `<optgroup label="Predefined presets">`;
+  html += defaultPresets.map((preset) =>
+    `<option value="${preset.name}">${preset.name}</option>`
+  ).join('');
+  html += `</optgroup>`;
+  presetsSelect.innerHTML = html;
   // Update delete button state after rendering
-  updateDeleteButtonState()
+  updateDeleteButtonState();
 }
+
+
 
 function updateDeleteButtonState() {
   const selectedName = presetsSelect.value
   deletePresetBtn.disabled = !isUserPreset(selectedName)
 }
 
+
+
 function isUserPreset(name: string) {
   return userPresets.some(p => p.name === name)
 }
+
+function isDefaultPreset(name: string) {
+  return defaultPresets.some(p => p.name === name);
+}
+
+
 
 function setSlidersFromPreset(presetName: string) {
   const allPresets = [...defaultPresets, ...userPresets]
@@ -152,12 +204,15 @@ function setSlidersFromPreset(presetName: string) {
   updateDeleteButtonState()
 }
 
+
+
 // --- Save preset (open modal) ---
 savePresetBtn.addEventListener("click", () => {
   presetModal.style.display = "block";
   presetNameInput.value = "";
   presetNameInput.focus();
 });
+
 
 // --- Modal close logic ---
 closeModalBtn.onclick = () => {
@@ -169,8 +224,10 @@ window.onclick = (event) => {
   }
 };
 
+
 // --- Modal save logic ---
 modalSaveBtn.addEventListener("click", () => {
+
   const name = presetNameInput.value.trim();
   if (!name) {
     alert("Enter a name for your preset.");
@@ -180,16 +237,20 @@ modalSaveBtn.addEventListener("click", () => {
     alert("Preset name already exists.");
     return;
   }
+
   const newPreset = getCurrentPresetFromUI();
   newPreset.name = name;
   userPresets.push(newPreset);
   chrome.storage.local.set({ userPresets });
-  renderPresetsSelector();
+
+  updatePresetsSelector();
   presetsSelect.value = name;
   chrome.storage.local.set({ selectedPreset: name });
-  presetModal.style.display = "none";
   setSlidersFromPreset(name);
+
+  presetModal.style.display = "none";
 });
+
 
 // --- Delete preset ---
 deletePresetBtn.addEventListener("click", () => {
@@ -200,13 +261,14 @@ deletePresetBtn.addEventListener("click", () => {
   }
   userPresets = userPresets.filter(p => p.name !== name)
   chrome.storage.local.set({ userPresets })
-  renderPresetsSelector()
+  updatePresetsSelector()
   // Select first preset after deletion
   const firstPreset = presetsSelect.options[0]?.value || defaultPresets[0].name
   presetsSelect.value = firstPreset
   chrome.storage.local.set({ selectedPreset: firstPreset })
   setSlidersFromPreset(firstPreset)
 })
+
 
 // --- Load presets on startup ---
 loadUserPresets(() => {
@@ -219,13 +281,16 @@ loadUserPresets(() => {
   })
 })
 
+
 // --- Update sliders and storage on preset change ---
 presetsSelect.addEventListener("change", () => {
   chrome.storage.local.set({ selectedPreset: presetsSelect.value })
   setSlidersFromPreset(presetsSelect.value)
-  logCurrentPreset()
+
   // Update delete button state on change
   updateDeleteButtonState()
+
+  // updateCurrentFilters();
 });
 
 
@@ -235,17 +300,20 @@ presetsSelect.addEventListener("change", () => {
 // Get reference to the Equalizer toggle button
 const eqToggle = document.querySelector<HTMLButtonElement>('#eq-toggle-btn')!;
 
+
 // Update the button appearance and text based on enabled state
 function updateEqToggle(enabled: boolean) {
   eqToggle.classList.toggle('on', enabled);
   eqToggle.textContent = enabled ? "Equalizer ON" : "Equalizer OFF";
 }
 
+
 // Initialize button state from chrome.storage
 chrome.storage.local.get("eqEnabled", data => {
   const enabled = Boolean(data.eqEnabled);
   updateEqToggle(enabled);
 });
+
 
 // Handle button click: toggle state and update storage
 eqToggle.addEventListener("click", () => {
@@ -258,16 +326,13 @@ eqToggle.addEventListener("click", () => {
 
 
 
-
-
-
 // MARK: Sliders
 // Helper: collect current preset from UI
 function getCurrentPresetFromUI(): { name: string, filters: any[] } {
   return {
     name: presetsSelect.value,
     filters: slidersConfig.map((cfg, i) => ({
-      freq: parseFloat(cfg.freq),
+      freq: cfg.freq,
       gain: parseFloat((document.getElementById(`slider${i+1}`) as HTMLInputElement).value),
       Q: parseFloat((document.getElementById(`q-input-${i+1}`) as HTMLInputElement).value),
       type: (document.getElementById(`filter-type-${i+1}`) as HTMLSelectElement).value
@@ -276,20 +341,19 @@ function getCurrentPresetFromUI(): { name: string, filters: any[] } {
 }
 
 
-
-
-
-
-
-
-
-// Helper: log current preset
-function logCurrentPreset() {
-  console.log('[EQ] Current preset:', getCurrentPresetFromUI());
+function getCurrentFiltersFromUI(): any[] {
+  return slidersConfig.map((cfg, i) => ({
+    freq: cfg.freq,
+    gain: parseFloat((document.getElementById(`slider${i+1}`) as HTMLInputElement).value),
+    Q: parseFloat((document.getElementById(`q-input-${i+1}`) as HTMLInputElement).value),
+    type: (document.getElementById(`filter-type-${i+1}`) as HTMLSelectElement).value
+  }));
 }
+
 
 // Helper: update current user preset in storage if selected
 function autosaveUserPreset() {
+  console.log('[autosaveUserPreset] Autosaving user preset');
   const name = presetsSelect.value;
   if (!isUserPreset(name)) return;
   const idx = userPresets.findIndex(p => p.name === name);
@@ -298,9 +362,21 @@ function autosaveUserPreset() {
   chrome.storage.local.set({ userPresets });
 }
 
-slidersConfig.forEach(({ slider, input, initial }, i) => {
-  const sliderElem = document.getElementById(slider) as HTMLInputElement;
-  const inputElem = document.getElementById(input) as HTMLInputElement;
+
+function updateCurrentFilters() {
+  currentFilters = getCurrentFiltersFromUI();
+
+  console.log('[updateCurrentFilters] Current preset:', currentFilters);
+
+  chrome.storage.local.set({ currentFilters });
+}
+
+
+slidersConfig.forEach(({ initial }, i) => {
+
+  const sliderElem = document.getElementById(`slider${i+1}`) as HTMLInputElement;
+  const inputElem = document.getElementById(`input${i+1}`) as HTMLInputElement;
+
   const filterTypeElem = document.getElementById(`filter-type-${i+1}`) as HTMLSelectElement;
   const qInputElem = document.getElementById(`q-input-${i+1}`) as HTMLInputElement;
 
@@ -312,8 +388,10 @@ slidersConfig.forEach(({ slider, input, initial }, i) => {
   // Slider changes update input
   sliderElem.oninput = function () {
     inputElem.value = (this as HTMLInputElement).value;
-    logCurrentPreset();
+
+
     autosaveUserPreset();
+    updateCurrentFilters();
   };
 
   // Manual input changes update slider
@@ -323,23 +401,27 @@ slidersConfig.forEach(({ slider, input, initial }, i) => {
     val = Math.max(Number(sliderElem.min), Math.min(Number(sliderElem.max), val));
     sliderElem.value = val.toString();
     inputElem.value = sliderElem.value;
-    logCurrentPreset();
+
+
     autosaveUserPreset();
+    updateCurrentFilters();
   });
 
   // Filter type change
   if (filterTypeElem) {
     filterTypeElem.addEventListener("change", () => {
-      logCurrentPreset();
+
       autosaveUserPreset();
+      updateCurrentFilters();
     });
   }
 
   // Q value change
   if (qInputElem) {
     qInputElem.addEventListener("input", () => {
-      logCurrentPreset();
+
       autosaveUserPreset();
+      updateCurrentFilters();
     });
   }
 });

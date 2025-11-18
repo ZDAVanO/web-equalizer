@@ -22,20 +22,26 @@ const mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourc
 let previousAudioSource: MediaElementAudioSourceNode | null = null;
 let lastPlayedElement: HTMLMediaElement | null = null;
 
-let presetFilters: BiquadFilterNode[] = [];
+const FILTER_COUNT = 10;
+const equalizerFilters: BiquadFilterNode[] = Array.from({ length: FILTER_COUNT }, () => audioContext.createBiquadFilter());
 
 let appliedFilters: BiquadFilterNode[] = [];
 
+let userPresets: FilterPreset[] = [];
 
 
 // MARK: waitForElem
 function waitForElem(selector: string, cb: (el: Element) => void) {
     const el = document.querySelector(selector);
-    if (el) return cb(el);
+    if (el) {
+        console.log(`[waitForElem] Found element: ${selector}`);
+        return cb(el);
+    }
     const obs = new MutationObserver(() => {
         const el = document.querySelector(selector);
         if (el) {
             obs.disconnect();
+            console.log(`[waitForElem] Found element via MutationObserver: ${selector}`);
             cb(el);
         }
     });
@@ -53,30 +59,19 @@ function onEQDisabled() {
 }
 
 // MARK: createFilters
-function createFilters(cf_preset: FilterPreset): BiquadFilterNode[] {
-    console.log('createFilters');
-
-    const temp_filters = cf_preset.filters.map((band) => {
-      const filter = audioContext.createBiquadFilter();
-      filter.type = validFilterTypes.includes(band.type) ? band.type : 'peaking';
-      filter.frequency.value = band.freq || 0;
-      filter.Q.value = band.Q || 1;
-      filter.gain.value = band.gain || 0;
-      return filter;
+// Більше не створюємо нові фільтри, а лише оновлюємо параметри існуючих
+function updateFiltersFromPreset(cf_preset: FilterPreset) {
+    cf_preset.filters.forEach((band, i) => {
+        const filter = equalizerFilters[i];
+        if (filter) {
+            filter.type = validFilterTypes.includes(band.type) ? band.type : 'peaking';
+            filter.frequency.value = band.freq || 0;
+            filter.Q.value = band.Q || 1;
+            filter.gain.value = band.gain || 0;
+        }
     });
-
-    console.log('createFilters created:', temp_filters);
-    return temp_filters;
-
-    // return cf_preset.filters.map((band) => {
-    //     const filter = audioContext.createBiquadFilter();
-    //     filter.type = validFilterTypes.includes(band.type) ? band.type : 'peaking';
-    //     filter.frequency.value = band.freq || 0;
-    //     filter.Q.value = band.Q || 1;
-    //     filter.gain.value = band.gain || 0;
-    //     return filter;
-    // });
 }
+
 
 // MARK: applyEqualizer
 function applyEqualizer(ae_audioElement: HTMLMediaElement) {
@@ -107,7 +102,7 @@ function applyEqualizer(ae_audioElement: HTMLMediaElement) {
 
 
     let currentNode: AudioNode = audioSource;
-    for (const filter of presetFilters) {
+    for (const filter of equalizerFilters) {
         // console.log('Connecting filter', filter);
         currentNode.connect(filter);
         appliedFilters.push(filter);
@@ -123,8 +118,9 @@ function applyEqualizer(ae_audioElement: HTMLMediaElement) {
 
 
 
-// MARK: clearEqualizer
-function clearEqualizer(audioElement: HTMLMediaElement) {
+// MARK: disableEqualizer
+function disableEqualizer(audioElement: HTMLMediaElement) {
+    console.log('disableEqualizer');
     // Disconnect filters
     appliedFilters.forEach((filter) => filter.disconnect());
     appliedFilters = [];
@@ -132,10 +128,11 @@ function clearEqualizer(audioElement: HTMLMediaElement) {
     if (audioElement && mediaElementSources.has(audioElement)) {
         const sourceNode = mediaElementSources.get(audioElement)!;
         try {
+            console.log('[disableEqualizer] Reconnecting sourceNode directly to destination');
             sourceNode.disconnect();
             sourceNode.connect(audioContext.destination);
         } catch (e) {
-            console.warn('Error reconnecting sourceNode:', e);
+            console.warn('[disableEqualizer] Error reconnecting sourceNode:', e);
         }
     }
 }
@@ -149,7 +146,7 @@ function applyEQIfPlaying() {
         if (!audio.paused && !audio.ended && audio.readyState > 2) {
             lastPlayedElement = audio;
             if (eqEnabled) {
-                console.log('Applying EQ to currently playing element');
+                console.log('[applyEQIfPlaying] Applying EQ to currently playing element');
                 applyEqualizer(audio);
             }
         }
@@ -159,30 +156,54 @@ function applyEQIfPlaying() {
 
 
 
-// When page loads — read state and preset
-chrome.storage.local.get(["eqEnabled", "selectedPreset"], data => {
+// When page loads — read state, preset, and userPresets
+chrome.storage.local.get(["eqEnabled", "selectedPreset", "userPresets"], data => {
     eqEnabled = !!data.eqEnabled;
     console.log('[EQ] eqEnabled state on load:', eqEnabled);
 
-    // --- CHANGED: Load preset name from storage ---
+    // Load userPresets from storage
+    if (Array.isArray(data.userPresets)) {
+        userPresets = data.userPresets;
+        console.log('[EQ] Loaded userPresets from storage:', userPresets);
+    }
+
+    // Find preset by name in both defaultPresets and userPresets
     if (data.selectedPreset) {
-        const foundPreset = defaultPresets.find(preset => preset.name === data.selectedPreset);
+        const foundPreset = [...defaultPresets, ...userPresets].find(preset => preset.name === data.selectedPreset);
         if (foundPreset) {
             eqPreset = foundPreset;
-            presetFilters = createFilters(eqPreset);
+            updateFiltersFromPreset(eqPreset);
             console.log('[EQ] Loaded preset from storage:', eqPreset.name);
         }
     }
 
     eqEnabled ? onEQEnabled() : onEQDisabled();
+
     updateEQBtnVisual();
 
     applyEQIfPlaying();
 });
 
+
+
+
+
+
+
+
+
+
+
+
 // React to storage changes (all tabs update EQ automatically)
 chrome.storage.onChanged.addListener((changes, area) => {
     console.log('[EQ] storage.onChanged detected:', changes, area);
+
+    if (changes.userPresets) {
+        // Update userPresets variable when changed
+        userPresets = Array.isArray(changes.userPresets.newValue) ? changes.userPresets.newValue : [];
+        console.log('[EQ] userPresets updated:', userPresets);
+    }
 
     if (changes.eqEnabled) {
         eqEnabled = !!changes.eqEnabled.newValue;
@@ -196,7 +217,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
             if (eqEnabled) {
                 applyEqualizer(lastPlayedElement);
             } else {
-                clearEqualizer(lastPlayedElement);
+                disableEqualizer(lastPlayedElement);
             }
         }
     }
@@ -205,15 +226,37 @@ chrome.storage.onChanged.addListener((changes, area) => {
         const newPresetName = changes.selectedPreset.newValue;
         console.log('[EQ] selectedPreset changed:', newPresetName);
 
-        const foundPreset = defaultPresets.find(preset => preset.name === newPresetName);
+        // Search for preset in both defaultPresets and userPresets
+        const foundPreset = [...defaultPresets, ...userPresets].find(preset => preset.name === newPresetName);
         if (foundPreset) {
             eqPreset = foundPreset;
-            presetFilters = createFilters(eqPreset);
-            if (eqEnabled && lastPlayedElement) {
-                applyEqualizer(lastPlayedElement);
-            }
+            console.log('updating to preset:', eqPreset);
+            updateFiltersFromPreset(eqPreset);
+            // if (eqEnabled && lastPlayedElement) {
+            //     disableEqualizer(lastPlayedElement);
+            //     applyEqualizer(lastPlayedElement);
+            // }
         }
     }
+
+
+    if (changes.currentFilters) {
+        console.log('[EQ] currentFilters changed:', changes.currentFilters.newValue);
+        const newFilters = changes.currentFilters.newValue;
+        if (Array.isArray(newFilters) && newFilters.length === equalizerFilters.length) {
+            // Оновити параметри фільтрів
+            newFilters.forEach((band, i) => {
+                const filter = equalizerFilters[i];
+                if (filter) {
+                    filter.type = validFilterTypes.includes(band.type) ? band.type : 'peaking';
+                    filter.frequency.value = band.freq || 0;
+                    filter.Q.value = band.Q || 1;
+                    filter.gain.value = band.gain || 0;
+                }
+            });
+        }
+    }
+
 
     
 });
@@ -255,6 +298,7 @@ document.addEventListener('play', function (e) {
     if (eqEnabled) {
         if (lastPlayedElement === e.target && appliedFilters.length > 0) {
             // Already applied
+            console.log('Equalizer already applied to this element');
         } else {
             applyEqualizer(e.target as HTMLMediaElement);
         }
