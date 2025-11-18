@@ -15,14 +15,14 @@ const validFilterTypes: BiquadFilterType[] = [
 
 let eqEnabled = false;
 let eqToggleBtn: HTMLButtonElement | null = null;
+let eqPreset = defaultPresets[0];
 
 const audioContext = new AudioContext();
 const mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
 let previousAudioSource: MediaElementAudioSourceNode | null = null;
 let lastPlayedElement: HTMLMediaElement | null = null;
 
-const specifiedPreset = defaultPresets.find(preset => preset.name === "bassBoosterPlus")!;
-const presetFilters = createFilters(specifiedPreset);
+let presetFilters: BiquadFilterNode[] = [];
 
 let appliedFilters: BiquadFilterNode[] = [];
 
@@ -146,15 +146,23 @@ function clearEqualizer(audioElement: HTMLMediaElement) {
 
 
 
-// When page loads — read state
-chrome.storage.local.get("eqEnabled", data => {
-    // const state = data.eqEnabled || false;
+// When page loads — read state and preset
+chrome.storage.local.get(["eqEnabled", "selectedPreset"], data => {
     eqEnabled = !!data.eqEnabled;
     console.log('[EQ] eqEnabled state on load:', eqEnabled);
 
+    // --- CHANGED: Load preset name from storage ---
+    if (data.selectedPreset) {
+        const foundPreset = defaultPresets.find(preset => preset.name === data.selectedPreset);
+        if (foundPreset) {
+            eqPreset = foundPreset;
+            presetFilters = createFilters(eqPreset);
+            console.log('[EQ] Loaded preset from storage:', eqPreset.name);
+        }
+    }
+
     eqEnabled ? onEQEnabled() : onEQDisabled();
     updateEQBtnVisual();
-
 });
 
 // React to storage changes (all tabs update EQ automatically)
@@ -163,7 +171,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
     if (changes.eqEnabled) {
         eqEnabled = !!changes.eqEnabled.newValue;
-        // const newVal = changes.eqEnabled.newValue;
+
         console.log('[EQ] eqEnabled changed:', eqEnabled);
 
         eqEnabled ? onEQEnabled() : onEQDisabled();
@@ -178,7 +186,19 @@ chrome.storage.onChanged.addListener((changes, area) => {
         }
     }
 
+    if (changes.selectedPreset) {
+        const newPresetName = changes.selectedPreset.newValue;
+        console.log('[EQ] selectedPreset changed:', newPresetName);
 
+        const foundPreset = defaultPresets.find(preset => preset.name === newPresetName);
+        if (foundPreset) {
+            eqPreset = foundPreset;
+            presetFilters = createFilters(eqPreset);
+            if (eqEnabled && lastPlayedElement) {
+                applyEqualizer(lastPlayedElement);
+            }
+        }
+    }
 
     
 });
@@ -193,8 +213,8 @@ waitForElem('#right-content.right-content.style-scope.ytmusic-nav-bar', (panel) 
     const btn = document.createElement("button");
     btn.className = "eq-toggle-btn";
     btn.innerHTML = `<img src="${eq_icon}" alt="EQ Icon">`;
+    // btn.style.order = '-1';
 
-    btn.style.order = '-1';
     btn.onclick = () => {
         // eqOn = toggleEQ(eqOn, btn);
         chrome.runtime.sendMessage({ action: "open_popup" });
