@@ -1,22 +1,9 @@
 import './style.css'
-import defaultPresets from '../content/defaultPresets'
+import defaultPresets from '../defaultPresets'
+import { filterTypes, filterTypeShort } from '../filterTypes';
 
 console.log('Popup script loaded');
 
-const filterTypeShort: Record<BiquadFilterType, string> = {
-  lowpass: 'LP',
-  highpass: 'HP',
-  bandpass: 'BP',
-  lowshelf: 'LS',
-  highshelf: 'HS',
-  peaking: 'PK',
-  notch: 'NT',
-  allpass: 'AP'
-};
-
-const filterTypes: BiquadFilterType[] = [
-  "lowpass", "highpass", "bandpass", "lowshelf", "highshelf", "peaking", "notch", "allpass"
-];
 
 
 // Unified sliders configuration

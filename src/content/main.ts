@@ -1,13 +1,10 @@
-import './style.css'
+import { filterTypes } from '../filterTypes';
 
+import './style.css'
 import eq_icon from '@/assets/equalizer-svgrepo-com.svg'
 
 console.log('[content] YTM Equalizer Extension loaded');
 
-
-const validFilterTypes: BiquadFilterType[] = [
-    "lowpass", "highpass", "bandpass", "lowshelf", "highshelf", "peaking", "notch", "allpass"
-];
 
 
 let eqEnabled = false;
@@ -49,7 +46,7 @@ function updateFilters(filters: any[]) {
     filters.forEach((band, i) => {
         const filter = equalizerFilters[i];
         if (filter) {
-            filter.type = validFilterTypes.includes(band.type) ? band.type : 'peaking';
+            filter.type = filterTypes.includes(band.type) ? band.type : 'peaking';
             filter.frequency.value = band.freq || 0;
             filter.Q.value = band.Q || 1;
             filter.gain.value = band.gain || 0;
