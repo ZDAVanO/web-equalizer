@@ -2,11 +2,8 @@ import './style.css'
 
 import eq_icon from '@/assets/equalizer-svgrepo-com.svg'
 
-console.log('[CRXJS] Hello world from content script!')
-console.log('YTM Equalizer Extension loaded');
+console.log('[content] YTM Equalizer Extension loaded');
 
-
-import defaultPresets, { FilterPreset } from './defaultPresets';
 
 const validFilterTypes: BiquadFilterType[] = [
     "lowpass", "highpass", "bandpass", "lowshelf", "highshelf", "peaking", "notch", "allpass"
@@ -15,7 +12,6 @@ const validFilterTypes: BiquadFilterType[] = [
 
 let eqEnabled = false;
 let eqToggleBtn: HTMLButtonElement | null = null;
-let eqPreset = defaultPresets[0];
 
 const audioContext = new AudioContext();
 const mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
@@ -27,7 +23,6 @@ const equalizerFilters: BiquadFilterNode[] = Array.from({ length: FILTER_COUNT }
 
 let appliedFilters: BiquadFilterNode[] = [];
 
-let userPresets: FilterPreset[] = [];
 
 
 // MARK: waitForElem
@@ -48,20 +43,10 @@ function waitForElem(selector: string, cb: (el: Element) => void) {
     obs.observe(document.body, { childList: true, subtree: true });
 }
 
-// MARK: onEQEnabled
-function onEQEnabled() {
-    console.log('EQ enabled');
-}
 
-// MARK: onEQDisabled
-function onEQDisabled() {
-    console.log('EQ disabled');
-}
-
-// MARK: createFilters
-// Більше не створюємо нові фільтри, а лише оновлюємо параметри існуючих
-function updateFiltersFromPreset(cf_preset: FilterPreset) {
-    cf_preset.filters.forEach((band, i) => {
+// MARK: updateFilters
+function updateFilters(filters: any[]) {
+    filters.forEach((band, i) => {
         const filter = equalizerFilters[i];
         if (filter) {
             filter.type = validFilterTypes.includes(band.type) ? band.type : 'peaking';
@@ -86,7 +71,7 @@ function applyEqualizer(ae_audioElement: HTMLMediaElement) {
     } else {
         console.log('MediaElementSourceNode not found, creating new one');
         audioSource = audioContext.createMediaElementSource(ae_audioElement);
-        mediaElementSources.set(ae_audioElement, audioSource); // Зберігаємо джерело
+        mediaElementSources.set(ae_audioElement, audioSource); // save source to weakmap
     }
 
     console.log('previousAudioSource', previousAudioSource);
@@ -117,14 +102,13 @@ function applyEqualizer(ae_audioElement: HTMLMediaElement) {
 }
 
 
-
 // MARK: disableEqualizer
 function disableEqualizer(audioElement: HTMLMediaElement) {
     console.log('disableEqualizer');
     // Disconnect filters
     appliedFilters.forEach((filter) => filter.disconnect());
     appliedFilters = [];
-
+    // Reconnect source directly to destination
     if (audioElement && mediaElementSources.has(audioElement)) {
         const sourceNode = mediaElementSources.get(audioElement)!;
         try {
@@ -138,7 +122,7 @@ function disableEqualizer(audioElement: HTMLMediaElement) {
 }
 
 
-
+// MARK: applyEQIfPlaying
 function applyEQIfPlaying() {
     console.log('applyEQIfPlaying');
     const audios = document.querySelectorAll<HTMLMediaElement>('audio, video');
@@ -154,30 +138,16 @@ function applyEQIfPlaying() {
 }
 
 
-
-
-// When page loads — read state, preset, and userPresets
-chrome.storage.local.get(["eqEnabled", "selectedPreset", "userPresets"], data => {
+// MARK: Initial load from storage
+chrome.storage.local.get(['eqEnabled', 'currentFilters'], (data) => {
     eqEnabled = !!data.eqEnabled;
-    console.log('[EQ] eqEnabled state on load:', eqEnabled);
+    console.log('[content] eqEnabled state on load:', eqEnabled);
 
-    // Load userPresets from storage
-    if (Array.isArray(data.userPresets)) {
-        userPresets = data.userPresets;
-        console.log('[EQ] Loaded userPresets from storage:', userPresets);
+    // Load currentFilters
+    if (Array.isArray(data.currentFilters) && data.currentFilters.length === equalizerFilters.length) {
+        updateFilters(data.currentFilters);
+        console.log('[content] Loaded currentFilters from storage:', data.currentFilters);
     }
-
-    // Find preset by name in both defaultPresets and userPresets
-    if (data.selectedPreset) {
-        const foundPreset = [...defaultPresets, ...userPresets].find(preset => preset.name === data.selectedPreset);
-        if (foundPreset) {
-            eqPreset = foundPreset;
-            updateFiltersFromPreset(eqPreset);
-            console.log('[EQ] Loaded preset from storage:', eqPreset.name);
-        }
-    }
-
-    eqEnabled ? onEQEnabled() : onEQDisabled();
 
     updateEQBtnVisual();
 
@@ -185,32 +155,16 @@ chrome.storage.local.get(["eqEnabled", "selectedPreset", "userPresets"], data =>
 });
 
 
-
-
-
-
-
-
-
-
-
-
 // React to storage changes (all tabs update EQ automatically)
 chrome.storage.onChanged.addListener((changes, area) => {
-    console.log('[EQ] storage.onChanged detected:', changes, area);
+    console.log('[content] storage.onChanged detected:', changes, area);
 
-    if (changes.userPresets) {
-        // Update userPresets variable when changed
-        userPresets = Array.isArray(changes.userPresets.newValue) ? changes.userPresets.newValue : [];
-        console.log('[EQ] userPresets updated:', userPresets);
-    }
-
+    // Handle eqEnabled changes
     if (changes.eqEnabled) {
         eqEnabled = !!changes.eqEnabled.newValue;
 
-        console.log('[EQ] eqEnabled changed:', eqEnabled);
+        console.log('[content] eqEnabled changed:', eqEnabled);
 
-        eqEnabled ? onEQEnabled() : onEQDisabled();
         updateEQBtnVisual();
 
         if (lastPlayedElement) {
@@ -222,51 +176,18 @@ chrome.storage.onChanged.addListener((changes, area) => {
         }
     }
 
-    if (changes.selectedPreset) {
-        const newPresetName = changes.selectedPreset.newValue;
-        console.log('[EQ] selectedPreset changed:', newPresetName);
-
-        // Search for preset in both defaultPresets and userPresets
-        const foundPreset = [...defaultPresets, ...userPresets].find(preset => preset.name === newPresetName);
-        if (foundPreset) {
-            eqPreset = foundPreset;
-            console.log('updating to preset:', eqPreset);
-            updateFiltersFromPreset(eqPreset);
-            // if (eqEnabled && lastPlayedElement) {
-            //     disableEqualizer(lastPlayedElement);
-            //     applyEqualizer(lastPlayedElement);
-            // }
-        }
-    }
-
-
+    // Handle direct filter changes
     if (changes.currentFilters) {
-        console.log('[EQ] currentFilters changed:', changes.currentFilters.newValue);
+        console.log('[content] currentFilters changed:', changes.currentFilters.newValue);
         const newFilters = changes.currentFilters.newValue;
         if (Array.isArray(newFilters) && newFilters.length === equalizerFilters.length) {
-            // Оновити параметри фільтрів
-            newFilters.forEach((band, i) => {
-                const filter = equalizerFilters[i];
-                if (filter) {
-                    filter.type = validFilterTypes.includes(band.type) ? band.type : 'peaking';
-                    filter.frequency.value = band.freq || 0;
-                    filter.Q.value = band.Q || 1;
-                    filter.gain.value = band.gain || 0;
-                }
-            });
+            updateFilters(newFilters);
         }
     }
-
-
-    
 });
 
 
-
-
-
-
-
+// MARK: Insert EQ Toggle Button
 waitForElem('#right-content.right-content.style-scope.ytmusic-nav-bar', (panel) => {
     const btn = document.createElement("button");
     btn.className = "eq-toggle-btn";
@@ -274,7 +195,6 @@ waitForElem('#right-content.right-content.style-scope.ytmusic-nav-bar', (panel) 
     // btn.style.order = '-1';
 
     btn.onclick = () => {
-        // eqOn = toggleEQ(eqOn, btn);
         chrome.runtime.sendMessage({ action: "open_popup" });
     };
 
@@ -282,7 +202,6 @@ waitForElem('#right-content.right-content.style-scope.ytmusic-nav-bar', (panel) 
     panel.insertBefore(btn, panel.firstChild);
 
 });
-
 
 
 // MARK: updateEQBtnVisual
@@ -293,12 +212,13 @@ function updateEQBtnVisual() {
 }
 
 
+// MARK: Listen for play events
 document.addEventListener('play', function (e) {
     lastPlayedElement = e.target as HTMLMediaElement;
     if (eqEnabled) {
         if (lastPlayedElement === e.target && appliedFilters.length > 0) {
             // Already applied
-            console.log('Equalizer already applied to this element');
+            console.log('[addEventListener play] Equalizer already applied to this element');
         } else {
             applyEqualizer(e.target as HTMLMediaElement);
         }

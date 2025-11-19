@@ -47,11 +47,45 @@ const freqLabels: Record<number, string> = {
 };
 
 
+// Display names for default presets
+const presetDisplayNames: Record<string, string> = {
+  flat: "Flat",
+  acoustic: "Acoustic",
+  bassBooster: "Bass Booster",
+  bassBoosterPlus: "Bass Booster Plus",
+  BassBoosterUltra: "Bass Booster Ultra",
+  bassReducer: "Bass Reducer",
+  classical: "Classical",
+  club: "Club",
+  dance: "Dance",
+  deep: "Deep",
+  electronic: "Electronic",
+  hipHop: "Hip Hop",
+  jazz: "Jazz",
+  latin: "Latin",
+  live: "Live",
+  loudness: "Loudness",
+  lounge: "Lounge",
+  metal: "Metal",
+  piano: "Piano",
+  pop: "Pop",
+  reggae: "Reggae",
+  rnb: "R&B",
+  rock: "Rock",
+  ska: "Ska",
+  smallSpeakers: "Small Speakers",
+  soft: "Soft",
+  softRock: "Soft Rock",
+  spokenWord: "Spoken Word",
+  techno: "Techno",
+  trebleBooster: "Treble Booster",
+  trebleReducer: "Treble Reducer",
+  vocalBooster: "Vocal Booster"
+};
 
 
 
-
-// Helper to render a slider's HTML
+// MARK: renderSlider
 function renderSlider(idx: number, initial: number, freq: number) {
   return `
     <div id="range-slider-${idx}" class="range-slider">
@@ -76,7 +110,6 @@ function renderSlider(idx: number, initial: number, freq: number) {
     </div>
   `;
 }
-
 
 
 
@@ -111,7 +144,6 @@ document.querySelector('#app')!.innerHTML = `
 
 
 
-
 type Preset = { name: string, filters: any[] }
 let userPresets: Preset[] = []
 
@@ -133,9 +165,7 @@ const customPresetName = "[Custom]"
 
 
 
-
-
-
+// MARK: updatePresetsSelector
 function updatePresetsSelector() {
   // Group user presets and default presets using <optgroup>
   let html = '';
@@ -148,7 +178,7 @@ function updatePresetsSelector() {
   }
   html += `<optgroup label="Predefined presets">`;
   html += defaultPresets.map((preset) =>
-    `<option value="${preset.name}">${preset.name}</option>`
+    `<option value="${preset.name}">${presetDisplayNames[preset.name] || preset.name}</option>`
   ).join('');
   html += `</optgroup>`;
   presetsSelect.innerHTML = html;
@@ -157,12 +187,10 @@ function updatePresetsSelector() {
 }
 
 
-
 function updateDeleteButtonState() {
   const selectedName = presetsSelect.value
-  deletePresetBtn.disabled = !isUserPreset(selectedName) // || selectedName === customPresetName;
+  deletePresetBtn.disabled = !isUserPreset(selectedName) || selectedName === customPresetName;
 }
-
 
 
 function isUserPreset(name: string) {
@@ -174,15 +202,16 @@ function isDefaultPreset(name: string) {
 }
 
 
-
 function setSlidersFromPreset(presetName: string) {
   const allPresets = [...defaultPresets, ...userPresets]
   const preset = allPresets.find(p => p.name === presetName) || defaultPresets[0]
+  
   preset.filters.forEach((filter, i) => {
     const sliderElem = document.getElementById(`slider${i+1}`) as HTMLInputElement
     const inputElem = document.getElementById(`input${i+1}`) as HTMLInputElement
     const filterTypeElem = document.getElementById(`filter-type-${i+1}`) as HTMLSelectElement
     const qInputElem = document.getElementById(`q-input-${i+1}`) as HTMLInputElement
+    
     if (sliderElem && inputElem) {
       sliderElem.value = filter.gain.toString()
       inputElem.value = filter.gain.toString()
@@ -194,10 +223,10 @@ function setSlidersFromPreset(presetName: string) {
       qInputElem.value = filter.Q.toString()
     }
   })
+
   // Update delete button state when preset changes
   updateDeleteButtonState()
 }
-
 
 
 // --- Save preset (open modal) ---
@@ -232,8 +261,7 @@ modalSaveBtn.addEventListener("click", () => {
     return;
   }
 
-  const newPreset = getCurrentPresetFromUI();
-  newPreset.name = name;
+  const newPreset: Preset = { name: name, filters: getCurrentFiltersFromUI() };
   userPresets.push(newPreset);
   chrome.storage.local.set({ userPresets });
 
@@ -249,20 +277,24 @@ modalSaveBtn.addEventListener("click", () => {
 // --- Delete preset ---
 deletePresetBtn.addEventListener("click", () => {
   const name = presetsSelect.value
-  if (!isUserPreset(name)) {
+  if (!isUserPreset(name) || name === customPresetName) {
     alert("You can only delete user presets.")
     return
   }
   userPresets = userPresets.filter(p => p.name !== name)
   chrome.storage.local.set({ userPresets })
   updatePresetsSelector()
+
   // Select first preset after deletion
-  const firstPreset = presetsSelect.options[0]?.value || defaultPresets[0].name
+  // const firstPreset = presetsSelect.options[0]?.value || defaultPresets[0].name
+  const firstPreset = defaultPresets[0].name
   presetsSelect.value = firstPreset
   chrome.storage.local.set({ selectedPreset: firstPreset })
   setSlidersFromPreset(firstPreset)
-})
 
+  updateCurrentFilters();
+  
+})
 
 
 
@@ -285,18 +317,15 @@ chrome.storage.local.get("selectedPreset", data => {
 
 
 
-
-
-
 // --- Update sliders and storage on preset change ---
 presetsSelect.addEventListener("change", () => {
   chrome.storage.local.set({ selectedPreset: presetsSelect.value })
   setSlidersFromPreset(presetsSelect.value)
 
+  updateCurrentFilters();
+
   // Update delete button state on change
   updateDeleteButtonState()
-
-  // updateCurrentFilters();
 });
 
 
@@ -331,20 +360,6 @@ eqToggle.addEventListener("click", () => {
 
 
 
-// MARK: Sliders
-// Helper: collect current preset from UI
-function getCurrentPresetFromUI(): { name: string, filters: any[] } {
-  return {
-    name: presetsSelect.value,
-    filters: slidersConfig.map((cfg, i) => ({
-      freq: cfg.freq,
-      gain: parseFloat((document.getElementById(`slider${i+1}`) as HTMLInputElement).value),
-      Q: parseFloat((document.getElementById(`q-input-${i+1}`) as HTMLInputElement).value),
-      type: (document.getElementById(`filter-type-${i+1}`) as HTMLSelectElement).value
-    }))
-  };
-}
-
 
 function getCurrentFiltersFromUI(): any[] {
   return slidersConfig.map((cfg, i) => ({
@@ -356,62 +371,68 @@ function getCurrentFiltersFromUI(): any[] {
 }
 
 
-// Helper: update current user preset in storage if selected
-function autosaveUserPreset() {
-  console.log('[autosaveUserPreset] Autosaving user preset');
-  const name = presetsSelect.value;
-  if (!isUserPreset(name)) return;
-  const idx = userPresets.findIndex(p => p.name === name);
-  if (idx === -1) return;
-  userPresets[idx] = getCurrentPresetFromUI();
-  chrome.storage.local.set({ userPresets });
-}
 
-function autosaveCustomPreset() {
-  console.log('[autosaveCustomPreset]');
-
-  const name = presetsSelect.value;
-  if (!isDefaultPreset(name)) return;
-
-  const filters = getCurrentFiltersFromUI();
-  const customPreset: Preset = { name: customPresetName, filters };
-
-  // chrome.storage.local.set({ customPreset });
-  // Додаємо або оновлюємо "Custom" у userPresets
-  const idx = userPresets.findIndex(p => p.name === customPresetName);
-  if (idx === -1) {
-    userPresets.push(customPreset);
-  } else {
-    userPresets[idx] = customPreset;
-  }
-  chrome.storage.local.set({ userPresets });
-
-  updatePresetsSelector();
-  presetsSelect.value = customPresetName;
-
-  chrome.storage.local.set({ selectedPreset: customPresetName })
-
-}
-
-
-
-function updateCurrentFilters() {
-  currentFilters = getCurrentFiltersFromUI();
-
+// MARK: updateCurrentFilters
+function updateCurrentFilters(filters?: any[]) {
+  currentFilters = filters ?? getCurrentFiltersFromUI();
   console.log('[updateCurrentFilters] Current preset:', currentFilters);
-
   chrome.storage.local.set({ currentFilters });
 }
 
 
-function handleEqChanges() {
-  autosaveCustomPreset();
-  autosaveUserPreset();
-  updateCurrentFilters();
+
+// MARK: autosavePreset
+function autosavePreset() {
+  const name = presetsSelect.value;
+
+  if (isUserPreset(name)) {
+    console.log('[autosavePreset] UserPreset');
+    const filters = getCurrentFiltersFromUI();
+    const newPreset: Preset = { name: name, filters };
+
+    const idx = userPresets.findIndex(p => p.name === name);
+    if (idx === -1) return;
+    userPresets[idx] = newPreset;
+
+    chrome.storage.local.set({ userPresets });
+  }
+  
+  if (isDefaultPreset(name)) {
+    console.log('[autosavePreset] DefaultPreset');
+    const filters = getCurrentFiltersFromUI();
+    const customPreset: Preset = { name: customPresetName, filters };
+
+    // add or update [Custom] preset
+    const idx = userPresets.findIndex(p => p.name === customPresetName);
+    if (idx === -1) {
+      userPresets.push(customPreset);
+    } else {
+      userPresets[idx] = customPreset;
+    }
+
+    chrome.storage.local.set({ userPresets });
+
+    updatePresetsSelector();
+    presetsSelect.value = customPresetName;
+
+    chrome.storage.local.set({ selectedPreset: customPresetName })
+
+  }
 }
 
 
 
+
+
+
+
+function handleEqChanges() {
+  autosavePreset();
+  updateCurrentFilters();
+}
+
+
+// MARK: Setup event listeners
 slidersConfig.forEach(({ initial }, i) => {
 
   const sliderElem = document.getElementById(`slider${i+1}`) as HTMLInputElement;
