@@ -8,7 +8,7 @@ import eq_icon from '@/assets/equalizer-svgrepo-com.svg'
 
 
 import { setupAlbumArtObserver, updateButtonGlow } from './albumArt';
-
+// import { initVisualizer } from './visualizer';
 
 console.log('[content] YTM Equalizer Extension loaded');
 
@@ -20,6 +20,9 @@ let eqEnabled = false;
 let eqToggleBtn: HTMLButtonElement | null = null;
 
 const audioContext = new AudioContext();
+// const analyser = audioContext.createAnalyser();
+// analyser.fftSize = 256; // Set FFT size for visualizer
+
 const mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
 let previousAudioSource: MediaElementAudioSourceNode | null = null;
 let lastPlayedElement: HTMLMediaElement | null = null;
@@ -88,7 +91,11 @@ function applyEqualizer(ae_audioElement: HTMLMediaElement) {
         currentNode = filter;
     }
     devLog('appliedFilters', appliedFilters);
+    
     currentNode.connect(audioContext.destination);
+    // Connect to analyser before destination
+    // currentNode.connect(analyser);
+    // analyser.connect(audioContext.destination);
 
     devLog('Equalizer applied');
 
@@ -108,7 +115,12 @@ function disableEqualizer(audioElement: HTMLMediaElement) {
         try {
             devLog('[disableEqualizer] Reconnecting sourceNode directly to destination');
             sourceNode.disconnect();
+
             sourceNode.connect(audioContext.destination);
+            // Still connect through analyser even if EQ is disabled, so visualizer works
+            // sourceNode.connect(analyser);
+            // analyser.connect(audioContext.destination);
+            
         } catch (e) {
             console.warn('[disableEqualizer] Error reconnecting sourceNode:', e);
         }
@@ -126,6 +138,9 @@ function applyEQIfPlaying() {
             if (eqEnabled) {
                 devLog('[applyEQIfPlaying] Applying EQ to currently playing element');
                 applyEqualizer(audio);
+            // } else {
+            //      // Even if EQ is disabled, we might want to attach for visualizer if we want it always on
+            //      disableEqualizer(audio);
             }
         }
     });
@@ -217,9 +232,12 @@ document.addEventListener('play', function (e) {
         } else {
             applyEqualizer(e.target as HTMLMediaElement);
         }
+    // } else {
+    //     // If EQ disabled, ensure visualizer is connected
+    //     disableEqualizer(e.target as HTMLMediaElement);
     }
 }, true);
 
 
-
+// initVisualizer(analyser);
 
