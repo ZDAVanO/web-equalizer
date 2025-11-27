@@ -121,8 +121,7 @@ document.querySelector('#app')!.innerHTML = `
       ${slidersConfig.map(cfg => renderSlider(cfg.idx, cfg.freq)).join('')}
     </div>
 
-    <!-- Modal for new preset name -->
-    <div id="${Constants.PRESET_MODAL_ID}" class="modal" style="display:none;">
+    <dialog id="${Constants.PRESET_MODAL_ID}" class="modal" closedby="any">
       <div class="modal-content">
         <div class="modal-header">
           <span class="modal-title">New preset</span>
@@ -136,8 +135,8 @@ document.querySelector('#app')!.innerHTML = `
           <button id="${Constants.MODAL_CANCEL_BTN_ID}" type="button">Close</button>
         </div>
       </div>
-    </div>
-    
+    </dialog>
+
   </div>
 `
 
@@ -154,7 +153,7 @@ const presetsSelect = document.getElementById(Constants.PRESETS_SELECT_ID) as HT
 const savePresetBtn = document.getElementById(Constants.SAVE_PRESET_BTN_ID) as HTMLButtonElement;
 const deletePresetBtn = document.getElementById(Constants.DELETE_PRESET_BTN_ID) as HTMLButtonElement;
 
-const presetModal = document.getElementById(Constants.PRESET_MODAL_ID) as HTMLDivElement;
+const presetModal = document.getElementById(Constants.PRESET_MODAL_ID) as HTMLDialogElement;
 const closeModalBtn = document.getElementById(Constants.CLOSE_MODAL_BTN_ID) as HTMLButtonElement;
 const modalSaveBtn = document.getElementById(Constants.MODAL_SAVE_BTN_ID) as HTMLButtonElement;
 const modalCancelBtn = document.getElementById(Constants.MODAL_CANCEL_BTN_ID) as HTMLButtonElement;
@@ -230,22 +229,13 @@ function setSlidersFromPreset(presetName: string) {
 
 // --- Save preset (open modal) ---
 savePresetBtn.addEventListener("click", () => {
-  presetModal.style.display = "flex";
+  presetModal.showModal();
   presetNameInput.value = "";
   presetNameInput.focus();
 });
 
-// --- Modal close logic ---
-function closeModal() {
-  presetModal.style.display = "none";
-}
-closeModalBtn.onclick = closeModal;
-modalCancelBtn.onclick = closeModal;
-window.onclick = (event) => {
-  if (event.target === presetModal) {
-    closeModal();
-  }
-};
+closeModalBtn.onclick = () => presetModal.close();
+modalCancelBtn.onclick = () => presetModal.close();
 
 
 // --- Modal save logic ---
@@ -270,7 +260,7 @@ modalSaveBtn.addEventListener("click", () => {
   chrome.storage.local.set({ selectedPreset: name });
   setSlidersFromPreset(name);
 
-  presetModal.style.display = "none";
+  presetModal.close();
 });
 
 

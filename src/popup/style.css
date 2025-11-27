@@ -177,23 +177,44 @@ button:focus-visible {
 
 
 
-.modal {
-  position: fixed;
-  z-index: 1000;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(6px); /* додаємо розмиття */
-  -webkit-backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+select#presets-select {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  color: #fff;
+  cursor: pointer;
+  transition: border-color 0.25s;
 }
 
-/* Анімація появи модального вікна */
+select#presets-select:hover {
+  border-color: #646cff;
+}
+
+select#presets-select:focus,
+select#presets-select:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+
+
+
+.modal {
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  animation: modalFadeIn 0.32s cubic-bezier(.33,1.5,.68,1) both;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
 @keyframes modalFadeIn {
   from {
     opacity: 0;
@@ -206,17 +227,11 @@ button:focus-visible {
 }
 
 .modal-content {
-  background-color: #242424;
-  margin: 10% auto;
-  padding: 0;
-  gap: 0;
   min-width: 320px;
   max-width: 80vw;
-  border: none;
+
   display: flex;
   flex-direction: column;
-  border-radius: 14px;
-  animation: modalFadeIn 0.32s cubic-bezier(.33,1.5,.68,1) both;
 }
 
 .modal-header {
@@ -224,8 +239,7 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   background: #232323;
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
+
   padding: 10px 22px 10px 22px;
   border-bottom: 1px solid #292929;
 }
@@ -277,40 +291,12 @@ button:focus-visible {
   border-color: #646cff;
 }
 
-
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   background: #232323;
-  border-bottom-left-radius: 14px;
-  border-bottom-right-radius: 14px;
   padding: 10px 22px 10px 22px;
   border-top: 1px solid #292929;
 }
-
-select#presets-select {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 6px 10px;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  color: #fff;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-
-select#presets-select:hover {
-  border-color: #646cff;
-}
-
-select#presets-select:focus,
-select#presets-select:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-
-
 
